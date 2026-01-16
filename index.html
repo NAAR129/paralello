@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Interaktives Parallelogramm - JSXGraph</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jsxgraph@1.4.0/distrib/jsxgraph.css" />
+  <script src="https://cdn.jsdelivr.net/npm/jsxgraph@1.4.0/distrib/jsxgraphcore.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    #box { width: 800px; height: 600px; border: 1px solid #ccc; }
+    #controls { margin-top: 10px; }
+    #feedback { font-weight: bold; margin-top: 10px; }
+    #progress { margin-top: 5px; }
+  </style>
+</head>
+<body>
+<h1>Interaktives Parallelogramm - JSXGraph</h1>
+<div id="box"></div>
+<div id="controls">
+  <input type="number" id="areaInput" placeholder="Fläche eingeben">
+  <button onclick="checkArea()">Prüfen</button>
+  <div style="margin-top:10px;">
+    <label>Schritt: </label>
+    <div id="stepSlider"></div>
+  </div>
+</div>
+<div id="feedback"></div>
+<div id="progress">Schritt 1 von 4</div>
+
+<script>
+  let board = JXG.JSXGraph.initBoard('box', {
+    boundingbox: [-1, 10, 10, -1],
+    axis: true
+  });
+
+  // Schieberegler für Schritt
+  let stepSlider = board.create('slider', [[1,-0.5],[8,-0.5],[1,1,4]], {snapWidth:1, showValue:false});
+
+  // Frei bewegliche Punkte A, B, D mit Snap-to-Grid
+  let A = board.create('point',[0,0],{name:'A', color:'blue', size:4, snapToGrid:true, snapSize:[1,1]});
+  let B = board.create('point',[5,0],{name:'B', color:'blue', size:4, snapToGrid:true, snapSize:[1,1]});
+  let D = board.create('point',[1,4],{name:'D', color:'blue', size:4, snapToGrid:true, snapSize:[1,1]});
+
+  // Punkt C automatisch: C = B + (D - A)
+  let C = board.create('point',[B.X() + (D.X() - A.X()), B.Y() + (D.Y() - A.Y())], {name:'C', color:'blue', size:4, fixed:true});
+
+  function updateC() {
+    C.setPosition(JXG.COORDS_BY_USER,[B.X() + (D.X() - A.X()), B.Y() + (D.Y() - A.Y())]);
+  }
+
+  // Polygon
+  let poly = board.create('polygon',[A,B,C,D],{fillColor:'#8FBCE6', fillOpacity:0.3});
+
+  // Höhe innerhalb des Parallelogramms (rot)
+  let baseSegment = board.create('segment',[A,B],{visible:false}); // nur für Berechnung
+  let foot = board.create('perpendicularpoint',[D, baseSegment, 0],{visible:false});
+  let hLine = board.create('segment',[D, foot],{strokeWidth:2, strokeColor:'red', visible:false});
+
+  // Basis als grünes Segment für Schritt 3
+  let baseMeasureLine = board.create('segment',[A,B],{strokeColor:'green', strokeWidth:3, visible:false});
+
+  // Basis und Höhe als Textwerte in Schritt 3
+  let baseText = board.create('text',[()=>( (A.X()+B.X())/2 ), ()=>( (A.Y()+B.Y())/2 - 0.5 ), ()=>`b = ${getBase().toFixed(2)}`],
+                              {visible:false, fontSize:16, color:'green'});
+  let heightText = board.create('text',[()=>(D.X()+0.2),()=>(D.Y()+0.2), ()=>`h = ${getHeight().toFixed(2)}`], 
+                              {visible:false, fontSize:16, color:'red'});
+
+  // Basis & Höhe Funktionen
+  function getBase() { return Math.sqrt(Math.pow(B.X()-A.X(),2)+Math.pow(B.Y()-A.Y(),2)); }
+  function getHeight() { return Math.sqrt(Math.pow(D.X()-foot.X(),2)+Math.pow(D.Y()-foot.Y(),2)); }
+
+  // Eingabefeld Feedback
+  function checkArea() {
+    const input = parseFloat(document.getElementById('areaInput').value);
+    const correct = getBase() * getHeight();
+    let feedback = '';
+    if(Math.abs(input - correct)<0.01) feedback = '✅ Richtig! Fläche = ' + correct.toFixed(2);
+    else feedback = '❌ Falsch. Tipp: Fläche = Basis × Höhe';
+    document.getElementById('feedback').innerText = feedback;
+  }
+
+  // Update C, Höhe, Basis und Text bei Bewegung von A, B oder D
+  function updateAll() {
+    updateC();
+    foot.update();
+    hLine.update();
+    baseMeasureLine.update();
+    baseText.update();
+    heightText.update();
+  }
+  A.on('drag',updateAll);
+  B.on('drag',updateAll);
+  D.on('drag',updateAll);
+
+  // Schieberegler-Steuerung für Schritte
+  stepSlider.on('drag',function(){
+    let step = Math.round(stepSlider.Value());
+    document.getElementById('progress').innerText = 'Schritt ' + step + ' von 4';
+
+    if(step===1){
+      foot.setAttribute({visible:false});
+      hLine.setAttribute({visible:false});
+      baseMeasureLine.setAttribute({visible:false});
+      baseText.setAttribute({visible:false});
+      heightText.setAttribute({visible:false});
+      document.getElementById('feedback').innerText='';
+    }
+    if(step===2){
+      foot.setAttribute({visible:true});
+      hLine.setAttribute({visible:true});
+      baseMeasureLine.setAttribute({visible:false});
+      baseText.setAttribute({visible:false});
+      heightText.setAttribute({visible:false});
+      document.getElementById('feedback').innerText='Beobachte die Höhe des Parallelogramms.';
+    }
+    if(step===3){
+      baseMeasureLine.setAttribute({visible:true});
+      baseText.setAttribute({visible:true});
+      heightText.setAttribute({visible:true});
+      document.getElementById('feedback').innerText='Miss die Basis und die Höhe des Parallelogramms.';
+    }
+    if(step===4){
+      baseMeasureLine.setAttribute({visible:false});
+      baseText.setAttribute({visible:false});
+      heightText.setAttribute({visible:false});
+      document.getElementById('feedback').innerText='Berechne die Fläche mit der Formel: Fläche = Basis × Höhe.';
+    }
+  });
+
+</script>
+</body>
+</html>
